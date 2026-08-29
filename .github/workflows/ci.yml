@@ -210,6 +210,9 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     needs: [quality]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -225,18 +228,18 @@ jobs:
 
       - name: Publish SDK
         working-directory: packages/sdk
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish React
         working-directory: packages/react
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish Mock RPC
         working-directory: packages/mock-rpc
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
