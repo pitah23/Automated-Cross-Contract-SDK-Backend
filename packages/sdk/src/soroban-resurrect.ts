@@ -28,6 +28,7 @@ import {
   LedgerEntryDiff,
   TtlChange,
 } from './types.js'
+import { NOOP_LOGGER, onLogToLogger, type Logger } from './logger.js'
 import {
   FootprintKeys,
   extractKeysFromFootprint,
@@ -83,7 +84,11 @@ function extractInnerTransaction(tx: any): any {
 
 export class SorobanResurrect {
   private server: SorobanRpc.Server
-  private config: Required<Omit<SorobanResurrectConfig, 'timeout'>> & { timeout?: number }
+  private config: Required<Omit<SorobanResurrectConfig, 'timeout' | 'logger' | 'onLog'>> & {
+    timeout?: number
+    logger: Logger
+    onLog?: (level: 'info' | 'warn' | 'error', message: string, data?: unknown) => void
+  }
   private listeners: Record<string, Set<any>> = {}
   private failoverManager!: RpcFailoverManager
   private serverCache: Map<string, SorobanRpc.Server> = new Map()
@@ -94,18 +99,25 @@ export class SorobanResurrect {
   private activeTraceHeaders: Record<string, string> = {}
 
   constructor(config: SorobanResurrectConfig) {
+    const legacyOnLog = config.onLog
+    const resolvedLogger = config.logger ?? (legacyOnLog ? onLogToLogger(legacyOnLog) : NOOP_LOGGER)
+
     this.config = {
       allowHttp: false,
       restoreFee: DEFAULT_RESTORE_FEE,
       maxRestoreBatchSize: 50,
       simulateOnly: false,
       retryPolicy: new ExponentialBackoff(3, 500),
-      onLog: () => {},
+      logger: resolvedLogger,
+      onLog: legacyOnLog,
       useWebSocket: false,
       pollIntervalMs: 1000,
       maxPollAttempts: 30,
       ...config,
     }
+
+    this.config.logger = this.config.logger ?? resolvedLogger
+    this.config.onLog = this.config.onLog ?? legacyOnLog
 
     const serverOptions: SorobanRpc.Server.Options = {
       allowHttp: this.config.allowHttp,
